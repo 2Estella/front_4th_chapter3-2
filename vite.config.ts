@@ -35,5 +35,5 @@ export default mergeConfig(
         toFake: ['setTimeout', 'clearTimeout', 'Date', 'setInterval', 'clearInterval'],
       },
     },
-  }),
+  })
 );
