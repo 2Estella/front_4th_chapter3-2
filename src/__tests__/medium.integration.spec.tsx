@@ -11,7 +11,7 @@ import {
 } from '../__mocks__/handlersUtils';
 import App from '../App';
 import { server } from '../setupTests';
-import { Event } from '../types';
+import { Event, RepeatType } from '../types';
 
 // ! Hard 여기 제공 안함
 const setup = (element: ReactElement) => {
@@ -326,18 +326,85 @@ it('notificationTime을 10으로 하면 지정 시간 10분 전 알람 텍스트
 });
 
 describe('반복 일정 기능', () => {
-  describe('반복 일정 생성', () => {
-    it('매일 반복되는 일정을 생성하면 지정된 간격으로 일정이 표시된다', async () => {});
+  const saveRepeatSchedule = async (
+    user: UserEvent,
+    form: Omit<Event, 'id' | 'repeat'> & {
+      repeat: {
+        type: RepeatType;
+        interval: string;
+        endDate?: string;
+      };
+    }
+  ) => {
+    const { title, date, startTime, endTime, description, location, category, repeat } = form;
+
+    await user.click(screen.getAllByText('일정 추가')[0]);
+
+    await user.type(screen.getByLabelText('제목'), title);
+    await user.type(screen.getByLabelText('날짜'), date);
+    await user.type(screen.getByLabelText('시작 시간'), startTime);
+    await user.type(screen.getByLabelText('종료 시간'), endTime);
+    await user.type(screen.getByLabelText('설명'), description);
+    await user.type(screen.getByLabelText('위치'), location);
+    await user.selectOptions(screen.getByLabelText('카테고리'), category);
+
+    await user.click(screen.getByLabelText('반복 설정'));
+
+    await user.selectOptions(screen.getByLabelText('반복 유형'), repeat.type);
+    await user.type(screen.getByLabelText('반복 간격'), repeat.interval);
+    await user.type(screen.getByLabelText('반복 종료일'), repeat.endDate ?? '');
+
+    await user.click(screen.getByTestId('event-submit-button'));
+  };
+
+  describe.only('반복 일정 생성', () => {
+    it('반복 일정 체크박스를 클릭하면 반복 설정 영역이 표시된다', async () => {
+      const { user } = setup(<App />);
+
+      await user.click(screen.getByText('일정 추가'[0]));
+
+      const checkbox = screen.getByLabelText('반복 설정');
+      user.click(checkbox);
+
+      expect(screen.getByText('반복 유형')).toBeInTheDocument();
+    });
+
+    it('매일 반복되는 일정을 생성하면 지정된 간격으로 일정이 표시된다', async () => {
+      setupMockHandlerUpdating();
+
+      const { user } = setup(<App />);
+
+      await saveRepeatSchedule(user, {
+        title: '데일리 스크럼',
+        date: '2024-10-15',
+        startTime: '10:00',
+        endTime: '10:30',
+        description: '매일 아침 스크럼 미팅',
+        location: '회의실 A',
+        category: '업무',
+        repeat: {
+          type: 'daily',
+          interval: '1',
+          endDate: '2024-10-30',
+        },
+        notificationTime: 10,
+      });
+
+      const eventList = within(screen.getByTestId('event-list'));
+
+      expect(eventList.getByText('데일리 스크럼')).toBeInTheDocument();
+    });
+
     it('반복 횟수를 지정하여 일정을 생성할 수 있다', async () => {});
     it('반복 일정을 생성할 때 월간 반복 옵션을 선택할 수 있다', async () => {});
     it('2월 29일에 매년 반복으로 설정된 일정은 없는 날짜의 경우 마지막 날짜로 조정된다', async () => {});
     it('2월 29일에 매월 반복으로 설정된 일정은 없는 날짜의 경우 마지막 날짜로 조정된다', async () => {});
     it('매월 31일에 반복되는 일정을 생성할 때, 31일이 없는 달에는 마지막 날로 조정된다', async () => {});
 
-    // it('반복 일정을 생성할 때 주간 반복 시 특정 요일을 선택할 수 있다', async () => {});
-    // it('특정 날짜까지 반복되는 일정은 종료일 이후 생성되지 않는다', async () => {});
-    // it('특정 횟수만큼 반복된 일정은 지정된 횟수 이후 생성되지 않는다', async () => {});
-    // it('반복 일정을 생성할 때 예외 날짜 처리를 할 수 있다', async () => {});
+    it('반복 일정을 생성할 때 주간 반복 시 특정 요일을 선택할 수 있다', async () => {});
+    it('특정 날짜까지 반복되는 일정은 종료일 이후 생성되지 않는다', async () => {});
+    it('특정 횟수만큼 반복된 일정은 지정된 횟수 이후 생성되지 않는다', async () => {});
+    it('반복 일정을 생성할 때 예외 날짜 처리를 할 수 있다', async () => {});
   });
 
   describe('반복 일정 표시', () => {
