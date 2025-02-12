@@ -37,6 +37,7 @@ import {
   Tr,
   useToast,
   VStack,
+  Badge,
 } from '@chakra-ui/react';
 import { useRef, useState } from 'react';
 
@@ -56,8 +57,8 @@ import { useCalendarView } from '@/hooks/useCalendarView';
 import { useEventForm } from '@/hooks/useEventForm';
 import { useEventOperations } from '@/hooks/useEventOperations';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useRepeatEvents } from '@/hooks/useRepeatEvents';
 import { useSearch } from '@/hooks/useSearch';
-
 const categories = ['업무', '개인', '가족', '기타'];
 
 const weekDays = ['일', '월', '화', '수', '목', '금', '토'];
@@ -104,8 +105,11 @@ function App() {
     editEvent,
   } = useEventForm();
 
-  const { events, saveEvent, deleteEvent } = useEventOperations(Boolean(editingEvent), () =>
-    setEditingEvent(null)
+  const { createRepeatEvents } = useRepeatEvents();
+
+  const { events, saveEvent, deleteEvent, saveEventsList, deleteEventsList } = useEventOperations(
+    Boolean(editingEvent),
+    () => setEditingEvent(null)
   );
 
   const { notifications, notifiedEvents, setNotifications } = useNotifications(events);
@@ -161,7 +165,14 @@ function App() {
       setOverlappingEvents(overlapping);
       setIsOverlapDialogOpen(true);
     } else {
-      await saveEvent(eventData);
+      if (isRepeating && repeatType !== 'none') {
+        // 반복 일정 생성
+        const eventList = createRepeatEvents(eventData as Event);
+        await saveEventsList({ events: eventList });
+      } else {
+        // 단일 일정 생성
+        await saveEvent(eventData);
+      }
       resetForm();
     }
   };
@@ -471,6 +482,11 @@ function App() {
                       >
                         {event.title}
                       </Text>
+                      {event.repeat.type !== 'none' && (
+                        <Badge variant="solid" colorScheme="blue">
+                          반복 일정
+                        </Badge>
+                      )}
                     </HStack>
                     <Text>{event.date}</Text>
                     <Text>
