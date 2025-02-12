@@ -232,6 +232,7 @@ describe('검색 기능', () => {
     await user.type(searchInput, '팀 회의');
 
     const eventList = within(screen.getByTestId('event-list'));
+
     expect(eventList.getByText('팀 회의')).toBeInTheDocument();
   });
 
@@ -348,7 +349,13 @@ describe('반복 일정 기능', () => {
     await user.type(screen.getByLabelText('위치'), location);
     await user.selectOptions(screen.getByLabelText('카테고리'), category);
 
-    await user.click(screen.getByLabelText('반복 설정'));
+    const checkbox = screen.getByLabelText('반복 설정');
+
+    if (!(checkbox as HTMLInputElement).checked) {
+      await user.click(checkbox);
+    }
+
+    await screen.findByText('반복 유형');
 
     await user.selectOptions(screen.getByLabelText('반복 유형'), repeat.type);
     await user.type(screen.getByLabelText('반복 간격'), repeat.interval);
@@ -357,7 +364,7 @@ describe('반복 일정 기능', () => {
     await user.click(screen.getByTestId('event-submit-button'));
   };
 
-  describe.only('반복 일정 생성', () => {
+  describe('반복 일정 생성', () => {
     it('반복 일정 체크박스를 클릭하면 반복 설정 영역이 표시된다', async () => {
       const { user } = setup(<App />);
 
@@ -370,7 +377,7 @@ describe('반복 일정 기능', () => {
     });
 
     it('매일 반복되는 일정을 생성하면 지정된 간격으로 일정이 표시된다', async () => {
-      setupMockHandlerUpdating();
+      setupMockHandlerCreation();
 
       const { user } = setup(<App />);
 
@@ -391,32 +398,312 @@ describe('반복 일정 기능', () => {
       });
 
       const eventList = within(screen.getByTestId('event-list'));
+      const dailyScrums = eventList.getAllByText('데일리 스크럼');
 
-      expect(eventList.getByText('데일리 스크럼')).toBeInTheDocument();
+      expect(dailyScrums).toHaveLength(16); // 예: 10/15부터 10/30까지 16개
     });
 
-    it('반복 횟수를 지정하여 일정을 생성할 수 있다', async () => {});
-    it('반복 일정을 생성할 때 월간 반복 옵션을 선택할 수 있다', async () => {});
-    it('2월 29일에 매년 반복으로 설정된 일정은 없는 날짜의 경우 마지막 날짜로 조정된다', async () => {});
-    it('2월 29일에 매월 반복으로 설정된 일정은 없는 날짜의 경우 마지막 날짜로 조정된다', async () => {});
-    it('매월 31일에 반복되는 일정을 생성할 때, 31일이 없는 달에는 마지막 날로 조정된다', async () => {});
+    it('반복 횟수를 지정하여 일정을 생성할 수 있다', async () => {
+      setupMockHandlerCreation();
 
-    it('반복 일정을 생성할 때 주간 반복 시 특정 요일을 선택할 수 있다', async () => {});
-    it('특정 날짜까지 반복되는 일정은 종료일 이후 생성되지 않는다', async () => {});
-    it('특정 횟수만큼 반복된 일정은 지정된 횟수 이후 생성되지 않는다', async () => {});
-    it('반복 일정을 생성할 때 예외 날짜 처리를 할 수 있다', async () => {});
+      const { user } = setup(<App />);
+
+      await saveRepeatSchedule(user, {
+        title: '주간 회의',
+        date: '2024-10-15',
+        startTime: '14:00',
+        endTime: '15:00',
+        description: '주간 회의',
+        location: '회의실 B',
+        category: '업무',
+        repeat: {
+          type: 'weekly',
+          interval: '3',
+          endDate: '2024-10-30',
+        },
+        notificationTime: 10,
+      });
+
+      const eventList = within(screen.getByTestId('event-list'));
+
+      expect(eventList.getByText('2024-10-15')).toBeInTheDocument();
+      expect(eventList.getByText('2024-10-22')).toBeInTheDocument();
+      expect(eventList.getByText('2024-10-29')).toBeInTheDocument();
+
+      const events = eventList.getAllByText('주간 회의');
+
+      expect(events).toHaveLength(3);
+    });
+
+    it('반복 일정을 생성할 때 월간 반복 옵션을 선택할 수 있다', async () => {});
+
+    it('2월 29일에 매년 반복으로 설정된 일정은 없는 날짜의 경우 마지막 날짜로 조정된다', async () => {
+      setupMockHandlerCreation();
+
+      const { user } = setup(<App />);
+
+      await saveRepeatSchedule(user, {
+        title: '월말 회의',
+        date: '2024-02-29',
+        startTime: '15:00',
+        endTime: '16:00',
+        description: '월말 회의',
+        location: '회의실 A',
+        category: '업무',
+        repeat: {
+          type: 'yearly',
+          interval: '1',
+          endDate: '2026-04-30',
+        },
+        notificationTime: 10,
+      });
+
+      const eventList = within(screen.getByTestId('event-list'));
+
+      expect(eventList.getByText('2024-02-29')).toBeInTheDocument();
+      expect(eventList.getByText('2025-02-28')).toBeInTheDocument();
+      expect(eventList.getByText('2026-02-28')).toBeInTheDocument();
+
+      const events = eventList.getAllByText('월말 회의');
+
+      expect(events).toHaveLength(3);
+    });
+
+    it('2월 29일에 매월 반복으로 설정된 일정은 없는 날짜의 경우 마지막 날짜로 조정된다', async () => {
+      setupMockHandlerCreation();
+
+      const { user } = setup(<App />);
+
+      await saveRepeatSchedule(user, {
+        title: '월말 회의',
+        date: '2024-02-29',
+        startTime: '15:00',
+        endTime: '16:00',
+        description: '월말 회의',
+        location: '회의실 A',
+        category: '업무',
+        repeat: {
+          type: 'monthly',
+          interval: '1',
+          endDate: '2024-05-31',
+        },
+        notificationTime: 10,
+      });
+
+      const eventList = within(screen.getByTestId('event-list'));
+
+      expect(eventList.getByText('2024-03-31')).toBeInTheDocument();
+      expect(eventList.getByText('2024-04-30')).toBeInTheDocument();
+      expect(eventList.getByText('2024-05-31')).toBeInTheDocument();
+
+      const events = eventList.getAllByText('월말 회의');
+
+      expect(events).toHaveLength(3);
+    });
+
+    it('매월 31일에 반복되는 일정을 생성할 때, 31일이 없는 달에는 마지막 날로 조정된다', async () => {
+      setupMockHandlerCreation();
+
+      const { user } = setup(<App />);
+
+      // 반복 일정 생성 (매월 반복, 1월 31일부터 3월 31일까지)
+      await saveRepeatSchedule(user, {
+        title: '월말 회의',
+        date: '2024-10-31',
+        startTime: '15:00',
+        endTime: '16:00',
+        description: '월말 회의',
+        location: '회의실 A',
+        category: '업무',
+        repeat: {
+          type: 'monthly',
+          interval: '1',
+          endDate: '2025-03-31',
+        },
+        notificationTime: 10,
+      });
+
+      const eventList = within(screen.getByTestId('event-list'));
+
+      const events = eventList.getAllByText('월말 회의');
+
+      expect(eventList.getByText('2024-11-30')).toBeInTheDocument();
+      expect(eventList.getByText('2024-12-31')).toBeInTheDocument();
+      expect(eventList.getByText('2025-01-31')).toBeInTheDocument();
+      expect(eventList.getByText('2025-02-28')).toBeInTheDocument();
+      expect(eventList.getByText('2025-03-31')).toBeInTheDocument();
+
+      expect(events).toHaveLength(5);
+    });
+
+    it('특정 날짜까지 반복되는 일정은 종료일 이후 생성되지 않는다', async () => {
+      setupMockHandlerCreation();
+
+      const { user } = setup(<App />);
+
+      await saveRepeatSchedule(user, {
+        title: '주간 미팅',
+        date: '2024-10-15',
+        startTime: '14:00',
+        endTime: '15:00',
+        description: '주간 미팅',
+        location: '회의실 A',
+        category: '업무',
+        repeat: {
+          type: 'weekly',
+          interval: '1',
+          endDate: '2024-11-05',
+        },
+        notificationTime: 10,
+      });
+
+      const eventList = within(screen.getByTestId('event-list'));
+
+      expect(eventList.getByText('2024-10-15')).toBeInTheDocument();
+      expect(eventList.getByText('2024-10-22')).toBeInTheDocument();
+      expect(eventList.getByText('2024-10-29')).toBeInTheDocument();
+      expect(eventList.getByText('2024-11-05')).toBeInTheDocument();
+
+      // 종료일 이후 날짜의 일정이 없는지 확인
+      expect(eventList.queryByText('2024-11-12')).not.toBeInTheDocument();
+
+      expect(eventList.getAllByText('주간 미팅')).toHaveLength(4);
+    });
+
+    // it('반복 일정을 생성할 때 주간 반복 시 특정 요일을 선택할 수 있다', async () => {});
+    // it('반복 일정을 생성할 때 예외 날짜 처리를 할 수 있다', async () => {});
   });
 
   describe('반복 일정 표시', () => {
-    it('반복 일정인 경우, 해당 일정에 "반복" 이라고 표시된다', async () => {});
+    it('반복 일정인 경우, 해당 일정에 "반복" 이라고 표시된다', async () => {
+      setupMockHandlerCreation();
+
+      const { user } = setup(<App />);
+
+      await saveRepeatSchedule(user, {
+        title: '주간 회의',
+        date: '2024-10-15',
+        startTime: '14:00',
+        endTime: '15:00',
+        description: '주간 회의',
+        location: '회의실 A',
+        category: '업무',
+        repeat: {
+          type: 'weekly',
+          interval: '1',
+          endDate: '2024-10-29',
+        },
+        notificationTime: 10,
+      });
+
+      const eventList = within(screen.getByTestId('event-list'));
+
+      expect(eventList.getAllByText('반복')).toHaveLength(3);
+    });
   });
 
   describe('반복 일정 수정', () => {
-    it('반복 일정에서 특정 날짜의 일정을 수정하면 전체 반복 일정이 아닌 해당 일정만 변경된다', async () => {});
+    it('반복 일정에서 특정 날짜의 일정을 수정하면 전체 반복 일정이 아닌 해당 일정만 변경된다', async () => {
+      setupMockHandlerCreation();
+
+      const { user } = setup(<App />);
+
+      await saveRepeatSchedule(user, {
+        title: '주간 회의',
+        date: '2024-10-15',
+        startTime: '14:00',
+        endTime: '15:00',
+        description: '주간 회의',
+        location: '회의실 A',
+        category: '업무',
+        repeat: {
+          type: 'weekly',
+          interval: '1',
+          endDate: '2024-10-29',
+        },
+        notificationTime: 10,
+      });
+
+      const eventList = within(screen.getByTestId('event-list'));
+
+      const secondEvent = eventList.getByText('2024-10-22');
+
+      await user.click(secondEvent);
+      await user.type(screen.getByLabelText('제목'), ' - 변경됨');
+
+      await user.click(screen.getByTestId('event-submit-button'));
+
+      expect(eventList.getByText('주간 회의')).toBeInTheDocument();
+      expect(eventList.getByText('주간 회의 - 변경됨')).toBeInTheDocument();
+      expect(eventList.getByText('주간 회의')).toBeInTheDocument();
+    });
   });
 
   describe('반복 일정 삭제', () => {
-    it('반복 일정의 단일 일정을 삭제하면 해당 일정만 삭제된다', async () => {});
-    it('반복 전체 일정을 삭제하면 모든 반복 일정이 삭제된다', async () => {});
+    it('반복 일정의 단일 일정을 삭제하면 해당 일정만 삭제된다', async () => {
+      setupMockHandlerCreation();
+
+      const { user } = setup(<App />);
+
+      await saveRepeatSchedule(user, {
+        title: '주간 회의',
+        date: '2024-10-15',
+        startTime: '14:00',
+        endTime: '15:00',
+        description: '주간 회의',
+        location: '회의실 A',
+        category: '업무',
+        repeat: {
+          type: 'weekly',
+          interval: '1',
+          endDate: '2024-10-29',
+        },
+        notificationTime: 10,
+      });
+
+      const eventList = within(screen.getByTestId('event-list'));
+      const secondEvent = eventList.getByText('2024-10-22');
+
+      await user.click(secondEvent);
+      await user.click(screen.getByText('삭제'));
+      await user.click(screen.getByText('이 일정만 삭제'));
+
+      expect(eventList.getByText('2024-10-15')).toBeInTheDocument();
+      expect(eventList.queryByText('2024-10-22')).not.toBeInTheDocument();
+      expect(eventList.getByText('2024-10-29')).toBeInTheDocument();
+    });
+
+    it('반복 전체 일정을 삭제하면 모든 반복 일정이 삭제된다', async () => {
+      setupMockHandlerCreation();
+      const { user } = setup(<App />);
+
+      await saveRepeatSchedule(user, {
+        title: '주간 회의',
+        date: '2024-10-15',
+        startTime: '14:00',
+        endTime: '15:00',
+        description: '주간 회의',
+        location: '회의실 A',
+        category: '업무',
+        repeat: {
+          type: 'weekly',
+          interval: '1',
+          endDate: '2024-10-29',
+        },
+        notificationTime: 10,
+      });
+
+      const eventList = within(screen.getByTestId('event-list'));
+      const firstEvent = eventList.getByText('2024-10-15');
+
+      await user.click(firstEvent);
+      await user.click(screen.getByText('삭제'));
+      await user.click(screen.getByText('전체 반복 일정 삭제'));
+
+      expect(eventList.queryByText('2024-10-15')).not.toBeInTheDocument();
+      expect(eventList.queryByText('2024-10-22')).not.toBeInTheDocument();
+      expect(eventList.queryByText('2024-10-29')).not.toBeInTheDocument();
+      expect(eventList.queryByText('주간 회의')).not.toBeInTheDocument();
+    });
   });
 });
