@@ -5,7 +5,7 @@ import { Event } from '../types';
 
 // ! Hard 여기 제공 안함
 export const setupMockHandlerCreation = (initEvents = [] as Event[]) => {
-  const mockEvents: Event[] = [...initEvents];
+  let mockEvents: Event[] = [...initEvents];
 
   server.use(
     // 일정 목록 조회
@@ -22,9 +22,15 @@ export const setupMockHandlerCreation = (initEvents = [] as Event[]) => {
     // 반복 일정 생성
     http.post('/api/events-list', async ({ request }) => {
       const { events } = (await request.json()) as { events: Event[] };
+      const repeatId = `repeat-${mockEvents.length + 1}`;
+
       const newEvents = events.map((event: Event, index: number) => ({
         ...event,
         id: String(mockEvents.length + index + 1),
+        repeat: {
+          ...event.repeat,
+          id: event.repeat?.type !== 'none' ? repeatId : undefined,
+        },
       }));
 
       mockEvents.push(...newEvents);
@@ -46,6 +52,18 @@ export const setupMockHandlerUpdating = () => {
       category: '업무',
       repeat: { type: 'none', interval: 0 },
       notificationTime: 10,
+    },
+    {
+      id: '2',
+      title: '기존 회의2',
+      date: '2024-10-15',
+      startTime: '11:00',
+      endTime: '12:00',
+      description: '기존 팀 미팅 2',
+      location: '회의실 C',
+      category: '업무 회의',
+      repeat: { type: 'none', interval: 0 },
+      notificationTime: 5,
     },
   ];
 
